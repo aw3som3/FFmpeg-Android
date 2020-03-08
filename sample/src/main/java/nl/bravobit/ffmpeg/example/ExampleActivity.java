@@ -1,14 +1,24 @@
 package nl.bravobit.ffmpeg.example;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.ParcelFileDescriptor;
+import android.os.Process;
+
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
 import nl.bravobit.ffmpeg.FFmpeg;
 import nl.bravobit.ffmpeg.FFprobe;
 import nl.bravobit.ffmpeg.FFtask;
 import timber.log.Timber;
+
 
 /**
  * Created by Brian on 11-12-17.
@@ -127,12 +137,12 @@ public class ExampleActivity extends AppCompatActivity {
                     .putExtra("android.content.extra.SHOW_ADVANCED", true) // thanks Commonsware, https://issuetracker.google.com/issues/72053350
                     .putExtra("android.content.extra.FANCY", true)
                     .putExtra("android.content.extra.SHOW_FILESIZE", true)
-                    .addCategory(Intent.CATEGORY_OPENABLE), DOC_OPEN_REQUEST);
+                    .addCategory(Intent.CATEGORY_OPENABLE), MOVIE_OPEN_REQUEST);
         }
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == MOVIE_OPEN_REQUEST && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             try {
@@ -140,7 +150,10 @@ public class ExampleActivity extends AppCompatActivity {
                 int fd = parcelFileDescriptor.getFd();
                 int pid = Process.myPid();
                 mediaFile = "/proc/" + pid + "/fd/" + fd;
-                Timber.i("opened " + uri + " as " + mediaFile);
+                mediaFile = "/storage/emulated/0/Download/file_example_MP4_480_1_5MG.mp4";
+                mediaFile = getFilesDir().getPath() + "/file_example_MP4_480_1_5MG.mp4";
+//                mediaFile = getExternalFilesDir(null) + "/file_example_MP4_480_1_5MG.mp4";
+                Timber.w("opened " + uri + " as " + mediaFile + ((new File(mediaFile)).canRead() ? " can" : " cannot") + " read");
                 runFFmpeg();
             } catch (Throwable e) {
                 Timber.e(e, "cannot work with " + uri);
@@ -151,9 +164,17 @@ public class ExampleActivity extends AppCompatActivity {
     }
     
     private void runFFmpeg() {
-        String outPath = getExternalFilesDir(null) + "/out.mp4"
+        String outPath = getExternalFilesDir(null) + "/out.mp4";
+        outPath = getFilesDir().getPath() + "/out.mp4";
+        try {
+            FileOutputStream fos = new FileOutputStream(outPath);
+            fos.write(123);
+        } catch (IOException e) {
+            Timber.e(e);
+        }
         new File(outPath).delete();
-        FFmpeg.getInstance(this).execute(new String[]{"-i", mediaFile, "-frames:v", "500", outPath}, new ExecuteBinaryResponseHandler() {
+        Timber.w("output: " + outPath + (new File(outPath).canWrite() ? " can" : " cannot") + " write");
+        FFmpeg.getInstance(this).execute(new String[]{"-i", mediaFile, "-frames:v", "500", "-y", outPath}, new ExecuteBinaryResponseHandler() {
             @Override
             public void onSuccess(String message) {
                 Timber.e(message.substring(0, 100));
